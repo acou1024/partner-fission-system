@@ -1,0 +1,379 @@
+// 私域合伙人裂变与分销核算系统 - 数据库模型定义
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// 系统用户表（管理员 + 员工）
+// ============================================================
+model SysUser {
+  id          Int       @id @default(autoincrement()) @map("id")
+  username    String    @unique @map("username") @db.VarChar(50)        // 登录用户名
+  password    String    @map("password") @db.VarChar(255)               // 加密后的密码
+  realName    String    @map("real_name") @db.VarChar(50)               // 真实姓名
+  phone       String?   @map("phone") @db.VarChar(20)                   // 手机号
+  role        String    @map("role") @db.VarChar(20)                    // 角色：admin=超级管理员, staff=员工
+  status      Int       @default(1) @map("status")                     // 状态：1=启用, 0=禁用
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  // 关联
+  partners      Partner[]       @relation("StaffPartners")              // 该员工名下的合伙人
+  operationLogs OperationLog[]                                          // 操作日志
+  transactions  Transaction[]                                           // 该员工录入的账单
+
+  @@map("sys_user")
+}
+
+// ============================================================
+// 合伙人/代理表（C端用户，两级结构）
+// ============================================================
+model Partner {
+  id              Int       @id @default(autoincrement()) @map("id")
+  name            String    @map("name") @db.VarChar(50)                // 合伙人姓名
+  wechatId        String?   @map("wechat_id") @db.VarChar(100)          // 微信号
+  phone           String?   @map("phone") @db.VarChar(20)               // 手机号
+  openId          String?   @unique @map("open_id") @db.VarChar(100)    // 微信OpenID（授权绑定后填入）
+  inviteCode      String    @unique @map("invite_code") @db.VarChar(32) // 专属邀请码
+  directRate      Decimal   @default(3.00) @map("direct_rate") @db.Decimal(5, 2) // 直推分润比例（%）- 固定模式
+  teamRate        Decimal   @default(1.00) @map("team_rate") @db.Decimal(5, 2)   // 团队分润比例（%）- 固定模式
+  rateMode        String    @default("fixed") @map("rate_mode") @db.VarChar(20)  // 分润模式：fixed=固定比例, tiered=阶梯比例
+  tieredRates     String?   @map("tiered_rates") @db.Text                        // 阶梯比例JSON，如：[{"min":0,"max":10000,"rate":1.5},{"min":10000,"max":50000,"rate":2},{"min":50000,"max":null,"rate":3}]
+  balance         Decimal   @default(0.00) @map("balance") @db.Decimal(12, 2)    // 当前可提现余额（元）
+  totalEarnings   Decimal   @default(0.00) @map("total_earnings") @db.Decimal(12, 2) // 累计总收益（元）
+  status          Int       @default(1) @map("status")                  // 状态：1=正常, 0=冻结
+  boundAt         DateTime? @map("bound_at")                            // 微信绑定时间
+
+  // 上级合伙人（二级结构）
+  parentId        Int?      @map("parent_id")
+  parent          Partner?  @relation("PartnerTree", fields: [parentId], references: [id])
+  children        Partner[] @relation("PartnerTree")                    // 下级合伙人列表
+
+  // 所属员工
+  staffId         Int       @map("staff_id")
+  staff           SysUser   @relation("StaffPartners", fields: [staffId], references: [id])
+
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  // 关联
+  customers       Customer[]                                            // 该合伙人拉的客户
+  commissions     Commission[]                                          // 佣金记录
+  settlements     Settlement[]                                          // 结算记录
+  customerReports CustomerReport[]                                      // 客户报备记录
+  ledgers         Ledger[]                                              // 手工记账本记录
+
+  @@index([staffId])
+  @@index([parentId])
+  @@index([inviteCode])
+  @@map("partner")
+}
+
+// ============================================================
+// 客户表（下线消费客户）
+// ============================================================
+model Customer {
+  id          Int       @id @default(autoincrement()) @map("id")
+  nickname    String    @map("nickname") @db.VarChar(100)               // 客户昵称
+  phone       String?   @map("phone") @db.VarChar(20)                   // 手机号
+  openId      String?   @unique @map("open_id") @db.VarChar(100)        // 微信OpenID（通过邀请码自动绑定）
+  remark      String?   @map("remark") @db.VarChar(255)                 // 备注信息
+  status      Int       @default(1) @map("status")                     // 状态：1=正常, 0=无效
+
+  // 归属合伙人
+  partnerId   Int       @map("partner_id")
+  partner     Partner   @relation(fields: [partnerId], references: [id])
+
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  // 关联
+  transactions Transaction[]                                            // 该客户的流水记录
+
+  @@index([partnerId])
+  @@index([openId])
+  @@map("customer")
+}
+
+// ============================================================
+// 流水账单表（员工手动录入）
+// ============================================================
+model Transaction {
+  id            Int       @id @default(autoincrement()) @map("id")
+  amount        Decimal   @map("amount") @db.Decimal(12, 2)             // 流水金额（元）
+  orderDate     DateTime  @map("order_date") @db.Date                   // 打单日期
+  remark        String?   @map("remark") @db.VarChar(255)               // 备注
+  plan          String?   @map("plan") @db.VarChar(50)                  // 下单方案名称（如 A、B、2.0）
+  returnAmount  Decimal?  @map("return_amount") @db.Decimal(12, 2)      // 兑奖金额（实际回流）
+  isArchived    Int       @default(0) @map("is_archived")              // 0: 未归档, 1: 已归档
+
+  // 关联客户
+  customerId    Int       @map("customer_id")
+  customer      Customer  @relation(fields: [customerId], references: [id])
+
+  // 录入员工
+  operatorId    Int       @map("operator_id")
+  operator      SysUser   @relation(fields: [operatorId], references: [id])
+
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  // 关联
+  commissions   Commission[]                                             // 该笔流水产生的佣金
+
+  @@index([customerId])
+  @@index([operatorId])
+  @@index([orderDate])
+  @@map("transaction")
+}
+
+// ============================================================
+// 佣金记录表（系统自动计算生成）
+// ============================================================
+model Commission {
+  id              Int       @id @default(autoincrement()) @map("id")
+  amount          Decimal   @map("amount") @db.Decimal(12, 2)           // 佣金金额（元）
+  rate            Decimal   @map("rate") @db.Decimal(5, 2)              // 分润比例（%）
+  type            String    @map("type") @db.VarChar(20)                // 类型：direct=直推佣金, team=团队佣金
+  settled         Int       @default(0) @map("settled")                 // 是否已结算：0=未结算, 1=已结算
+
+  // 关联合伙人
+  partnerId       Int       @map("partner_id")
+  partner         Partner   @relation(fields: [partnerId], references: [id])
+
+  // 关联流水
+  transactionId   Int       @map("transaction_id")
+  transaction     Transaction @relation(fields: [transactionId], references: [id])
+
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  @@index([partnerId])
+  @@index([transactionId])
+  @@index([settled])
+  @@map("commission")
+}
+
+// ============================================================
+// 结算记录表（员工线下转账后标记）
+// ============================================================
+model Settlement {
+  id            Int       @id @default(autoincrement()) @map("id")
+  amount        Decimal   @map("amount") @db.Decimal(12, 2)             // 结算金额（元）
+  remark        String?   @map("remark") @db.VarChar(255)               // 备注（如转账凭证）
+
+  // 关联合伙人
+  partnerId     Int       @map("partner_id")
+  partner       Partner   @relation(fields: [partnerId], references: [id])
+
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  @@index([partnerId])
+  @@map("settlement")
+}
+
+// ============================================================
+// 客户报备表（合伙人提交，员工审核）
+// ============================================================
+model CustomerReport {
+  id            Int       @id @default(autoincrement()) @map("id")
+  nickname      String    @map("nickname") @db.VarChar(100)             // 报备客户昵称/群名
+  remark        String?   @map("remark") @db.VarChar(255)               // 备注
+  status        String    @default("pending") @map("status") @db.VarChar(20) // 状态：pending=待审核, approved=已通过, rejected=已拒绝
+
+  // 报备合伙人
+  partnerId     Int       @map("partner_id")
+  partner       Partner   @relation(fields: [partnerId], references: [id])
+
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@index([partnerId])
+  @@index([status])
+  @@map("customer_report")
+}
+
+// ============================================================
+// 素材图片表（方案图片库）
+// ============================================================
+model Material {
+  id            Int       @id @default(autoincrement()) @map("id")
+  title         String?   @map("title") @db.VarChar(100)                // 标题
+  filePath      String    @map("file_path") @db.VarChar(500)            // 文件存储路径
+  fileSize      Int?      @map("file_size")                             // 文件大小（字节）
+  uploadDate    DateTime  @default(now()) @map("upload_date")            // 上传日期（用于按日期分组）
+
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  @@index([uploadDate])
+  @@map("material")
+}
+
+// ============================================================
+// 话术分类表（树状结构）
+// ============================================================
+model ScriptCategory {
+  id            Int       @id @default(autoincrement()) @map("id")
+  name          String    @map("name") @db.VarChar(100)                 // 分类名称
+  sortOrder     Int       @default(0) @map("sort_order")                // 排序序号
+
+  // 上级分类（支持多级树状结构）
+  parentId      Int?      @map("parent_id")
+  parent        ScriptCategory?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children      ScriptCategory[] @relation("CategoryTree")
+
+  // 关联话术内容
+  scripts       ScriptContent[]
+
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@index([parentId])
+  @@map("script_category")
+}
+
+// ============================================================
+// 话术内容表
+// ============================================================
+model ScriptContent {
+  id            Int       @id @default(autoincrement()) @map("id")
+  title         String    @map("title") @db.VarChar(200)                // 话术标题
+  content       String    @map("content") @db.Text                      // 话术内容（支持长文本）
+  sortOrder     Int       @default(0) @map("sort_order")                // 排序序号
+
+  // 所属分类
+  categoryId    Int       @map("category_id")
+  category      ScriptCategory @relation(fields: [categoryId], references: [id])
+
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@index([categoryId])
+  @@map("script_content")
+}
+
+// ============================================================
+// 域名配置表（防封域名管理）
+// ============================================================
+model DomainConfig {
+  id            Int       @id @default(autoincrement()) @map("id")
+  domain        String    @map("domain") @db.VarChar(255)               // 域名地址
+  type          String    @map("type") @db.VarChar(20)                  // 类型：entry=入口域名, landing=落地域名
+  isActive      Int       @default(0) @map("is_active")                 // 是否当前激活：1=是, 0=否
+  remark        String?   @map("remark") @db.VarChar(255)               // 备注
+
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@map("domain_config")
+}
+
+// ============================================================
+// 系统全局配置表
+// ============================================================
+model SystemConfig {
+  id            Int       @id @default(autoincrement()) @map("id")
+  configKey     String    @unique @map("config_key") @db.VarChar(100)   // 配置键
+  configValue   String    @map("config_value") @db.Text                 // 配置值
+  description   String?   @map("description") @db.VarChar(255)          // 配置说明
+
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@map("system_config")
+}
+
+// ============================================================
+// Q&A 反驳应对表
+// ============================================================
+model QaItem {
+  id            Int       @id @default(autoincrement()) @map("id")
+  question      String    @map("question") @db.VarChar(500)              // 客户提问
+  answer        String    @map("answer") @db.Text                        // 高情商回答
+  sortOrder     Int       @default(0) @map("sort_order")                 // 排序序号
+
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@map("qa_item")
+}
+
+// ============================================================
+// 风控红线字典表
+// ============================================================
+model RiskWord {
+  id            Int       @id @default(autoincrement()) @map("id")
+  badWord       String    @map("bad_word") @db.VarChar(100)              // 违规词
+  goodWord      String    @map("good_word") @db.VarChar(100)             // 安全替换词
+  sortOrder     Int       @default(0) @map("sort_order")                 // 排序序号
+
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@map("risk_word")
+}
+
+// ============================================================
+// 操作日志表（审计追踪）
+// ============================================================
+model OperationLog {
+  id            Int       @id @default(autoincrement()) @map("id")
+  module        String    @map("module") @db.VarChar(50)                // 操作模块
+  action        String    @map("action") @db.VarChar(50)                // 操作类型：create/update/delete
+  detail        String?   @map("detail") @db.Text                       // 操作详情（JSON）
+  ip            String?   @map("ip") @db.VarChar(50)                    // 操作IP
+
+  // 操作人
+  userId        Int       @map("user_id")
+  user          SysUser   @relation(fields: [userId], references: [id])
+
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([module])
+  @@index([createdAt])
+  @@map("operation_log")
+}
+
+// ============================================================
+// 手工记账本表（合伙人自己记录）
+// ============================================================
+// ============================================================
+// 方案赔率配置表（管理员配置）
+// ============================================================
+model BettingScheme {
+  id            Int       @id @default(autoincrement()) @map("id")
+  name          String    @map("name") @db.VarChar(50)                 // 方案名称（如 A、B、2.0、3.0）
+  odds          Decimal   @map("odds") @db.Decimal(6, 2)               // 赔率（如 1.70）
+  status        Int       @default(1) @map("status")                   // 1=启用, 0=停用
+  effectiveDate DateTime? @map("effective_date") @db.Date // 生效日期，按天维护赔率
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@unique([name, effectiveDate])
+  @@index([effectiveDate])
+  @@map("betting_scheme")
+}
+
+model Ledger {
+  id            Int       @id @default(autoincrement()) @map("id")
+  recordDate    DateTime  @map("record_date") @db.Date                  // 记账日期
+  title         String?   @map("title") @db.VarChar(100)                // 账单标题或描述
+  investAmount  Decimal   @map("invest_amount") @db.Decimal(12, 2)      // 投入资金
+  returnAmount  Decimal   @map("return_amount") @db.Decimal(12, 2)      // 回流资金
+  profitAmount  Decimal   @map("profit_amount") @db.Decimal(12, 2)      // 盈利 (return - invest)
+
+  // 关联合伙人
+  partnerId     Int       @map("partner_id")
+  partner       Partner   @relation(fields: [partnerId], references: [id])
+
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@index([partnerId])
+  @@index([recordDate])
+  @@map("ledger")
+}

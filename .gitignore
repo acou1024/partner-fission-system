@@ -1,0 +1,53 @@
+﻿# 依赖
+node_modules/
+
+# 构建产物
+dist/
+*.log
+vite.config.js.timestamp-*.mjs
+
+# 环境变量（保留 .env.example 用于文档）
+.env
+.env.production
+.env.local
+
+# 系统文件
+.DS_Store
+.vscode/
+.windsurf/
+
+# 工具输出
+.codegraph/
+.omx/
+
+# 上传文件
+uploads/
+
+# 部署包
+*.zip
+*.sql
+
+# 杂项 - 个人文件
+.xinghuo_continue_port
+xinghuo_continue_http.ps1
+bushu/
+image/
+image1/
+query
+Untitled-1.txt
+TT记账表.xlsx
+体彩系统.html
+CHANGELOG.md
+delivery-guide.md
+miniprogram-10/
+delivery-report.html
+delivery-screenshots/
+
+# 杂项 - 演讲/答辩材料
+generate_presentation_pdf.py
+三人核心答辩稿.md
+项目演讲.md
+项目演讲PPT-三分钟版.pdf
+项目演讲PPT-软件工程实训.md
+项目演讲稿-系统架构.md
+项目知识图谱.png

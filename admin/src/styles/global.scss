@@ -1,0 +1,152 @@
+/* 管理后台全局样式 - Apple/微信简约风格 */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #app {
+  height: 100%;
+  font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', 'Helvetica Neue', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 布局 */
+.admin-layout {
+  display: flex;
+  height: 100vh;
+}
+
+.admin-sidebar {
+  width: 230px;
+  background: #ffffff;
+  color: #1d1d1f;
+  flex-shrink: 0;
+  overflow-y: auto;
+  border-right: 1px solid rgba(0, 0, 0, 0.06);
+
+  .logo {
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 17px;
+    font-weight: 700;
+    color: #1d1d1f;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+    letter-spacing: 0.5px;
+  }
+
+  .el-menu {
+    border-right: none;
+    background: transparent;
+  }
+}
+
+.admin-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #f5f5f7;
+}
+
+.admin-header {
+  height: 56px;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  flex-shrink: 0;
+}
+
+.admin-content {
+  flex: 1;
+  padding: 24px;
+  overflow-y: auto;
+}
+
+/* 页面标题 */
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+
+  h2 {
+    font-size: 18px;
+    font-weight: 600;
+    color: #1d1d1f;
+  }
+}
+
+/* 搜索栏 */
+.search-bar {
+  background: #fff;
+  padding: 20px;
+  border-radius: 12px;
+  margin-bottom: 16px;
+  border: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+/* 表格卡片 */
+.table-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 20px;
+  border: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+/* Dashboard 统计卡片 */
+.stat-cards {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.stat-card {
+  background: #fff;
+  border-radius: 14px;
+  padding: 24px;
+  border: 1px solid rgba(0, 0, 0, 0.04);
+  transition: transform 0.2s;
+
+  &:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  }
+
+  .stat-label {
+    font-size: 13px;
+    color: #86868b;
+    margin-bottom: 8px;
+    font-weight: 500;
+  }
+
+  .stat-value {
+    font-size: 28px;
+    font-weight: 700;
+    color: #1d1d1f;
+  }
+
+  .stat-sub {
+    font-size: 12px;
+    color: #aeaeb2;
+    margin-top: 4px;
+  }
+
+  &.primary .stat-value { color: #3b82f6; }
+  &.success .stat-value { color: #22c55e; }
+  &.warning .stat-value { color: #f59e0b; }
+  &.danger .stat-value { color: #ef4444; }
+}
+
+/* 通用间距 */
+.mb-16 { margin-bottom: 16px; }
+.mb-20 { margin-bottom: 20px; }
+.mt-16 { margin-top: 16px; }
