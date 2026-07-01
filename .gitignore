@@ -13,6 +13,7 @@ vite.config.js.timestamp-*.mjs
 
 # 系统文件
 .DS_Store
+~$*
 .vscode/
 .windsurf/
 
@@ -42,6 +43,9 @@ delivery-guide.md
 miniprogram-10/
 delivery-report.html
 delivery-screenshots/
+
+# 本地文档源目录（已整理到 doc/）
+docs/
 
 # 杂项 - 演讲/答辩材料
 generate_presentation_pdf.py
